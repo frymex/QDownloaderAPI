@@ -65,6 +65,7 @@ Server will be available at:
 
 ```bash
 cp .env.example .env
+cp docker-compose.example.yml docker-compose.yml
 docker compose up --build -d
 ```
 

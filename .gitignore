@@ -17,6 +17,7 @@ venv/
 .env
 .env.*
 !.env.example
+docker-compose.yml
 
 # IDE / OS
 .vscode/

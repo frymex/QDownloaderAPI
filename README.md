@@ -1,74 +1,125 @@
 # QDownloaderAPI
 
-FastAPI-сервис с cobalt-совместимым API для загрузки контента из TikTok и Instagram.
+Cobalt-compatible downloader API built with FastAPI.
 
-Поддержка:
-- `POST /` в формате cobalt (`tunnel | picker | error`)
-- `GET /` (информация об инстансе)
-- `GET /tunnel?token=...` (проксирующий туннель)
-- `POST /session` (совместимый endpoint)
+It currently supports:
+- TikTok
+- Instagram
 
-Дополнительно:
+The API is designed to be a drop-in backend for clients that expect cobalt-style responses (`tunnel`, `picker`, `error`).
+
+## Features
+
+- Cobalt-compatible `POST /` processing endpoint
+- Signed tunnel links (`GET /tunnel?token=...`) instead of exposing raw CDN URLs
+- TikTok support:
+  - video posts
+  - photo slideshows
+  - optional H265 selection
+  - optional original audio selection
+- Instagram support:
+  - posts/reels/tv URLs
+  - share URLs
+  - single media and carousel (picker) responses
+- Docker-ready deployment
+
+## API Compatibility
+
+### Main cobalt-compatible endpoints
+
+- `POST /` — process media URL
+- `GET /` — instance info
+- `GET /tunnel?token=...` — stream media via tunnel
+- `POST /session` — compatibility token endpoint
+
+### Additional utility endpoints
+
+- `GET /health`
 - `POST /api/tiktok/resolve`
 - `POST /api/tiktok/links`
 - `POST /api/tiktok/download`
-- `GET /health`
+- `GET /api`
 
-## Почему это совместимо с вашим клиентом
+## Installation
 
-Ваш `QDownloader.process_url(...)` отправляет запрос в `POST /` и ожидает:
-- `status = "tunnel"` или `status = "redirect"` с полями `url`, `filename`
-- `status = "picker"` с `picker[]`
-- `status = "error"` с `error.code`
-
-Этот сервис возвращает именно такой формат.
-
-## Структура проекта
-
-```text
-.
-├─ main.py
-├─ tiktok_service.py
-├─ instagram_service.py
-├─ requirements.txt
-├─ Dockerfile
-├─ docker-compose.yml
-├─ .env.example
-└─ README.md
-```
-
-## Локальный запуск
+### 1) Local Python setup
 
 ```bash
 python -m venv .venv
 .venv\Scripts\activate
 pip install -r requirements.txt
+```
+
+### 2) Run server
+
+```bash
 uvicorn main:app --host 0.0.0.0 --port 8010 --reload
 ```
 
-## Docker запуск
+Server will be available at:
+- `http://localhost:8010`
+
+## Docker
+
+### Run with Docker Compose
 
 ```bash
 cp .env.example .env
 docker compose up --build -d
 ```
 
-Проверка:
+### Stop
 
 ```bash
-curl http://localhost:8010/health
+docker compose down
 ```
 
-## Минимальный пример запроса (cobalt-совместимый)
+## Configuration
 
-```bash
-curl -X POST "http://localhost:8010/" \
-  -H "Accept: application/json" \
-  -H "Content-Type: application/json" \
-  -d "{\"url\":\"https://www.tiktok.com/@user/video/123\"}"
+Environment variables:
+
+- `TUNNEL_SECRET`  
+  Secret used to sign tunnel tokens.  
+  Set a long random value in production.
+
+- `TUNNEL_TTL_SECONDS`  
+  Tunnel token lifetime in seconds (default: `900`).
+
+Example `.env`:
+
+```env
+TUNNEL_SECRET=replace-with-a-long-random-secret
+TUNNEL_TTL_SECONDS=900
 ```
 
-Типичный ответ:
+## Using It in Projects
+
+This API is intended to be consumed like cobalt.
+
+### Request format (`POST /`)
+
+```json
+{
+  "url": "https://www.tiktok.com/@user/video/1234567890",
+  "allowH265": false,
+  "tiktokFullAudio": false,
+  "downloadMode": "auto"
+}
+```
+
+Supported cobalt-style options:
+- `allowH265`
+- `tiktokFullAudio`
+- `downloadMode` (`auto | audio | mute`)
+
+Also accepted:
+- `h265`
+- `audio_only`
+- `full_audio`
+
+### Response format
+
+#### Tunnel response
 
 ```json
 {
@@ -78,7 +129,7 @@ curl -X POST "http://localhost:8010/" \
 }
 ```
 
-Для карусели:
+#### Picker response
 
 ```json
 {
@@ -90,28 +141,63 @@ curl -X POST "http://localhost:8010/" \
 }
 ```
 
-## Переменные окружения
+#### Error response
 
-- `TUNNEL_SECRET` — секрет подписи токена для `/tunnel`
-- `TUNNEL_TTL_SECONDS` — TTL токена (по умолчанию `900`)
+```json
+{
+  "status": "error",
+  "error": {
+    "code": "fetch.empty"
+  }
+}
+```
 
-Для production обязательно задайте уникальный `TUNNEL_SECRET`.
+## Integration Example (Python / aiohttp)
 
-## Совместимость параметров POST `/`
+```python
+import aiohttp
+import asyncio
 
-Поддерживаются cobalt-имена опций:
-- `allowH265`
-- `tiktokFullAudio`
-- `downloadMode` (`auto | audio | mute`)
+BASE_URL = "http://localhost:8010"
 
-А также внутренние:
-- `h265`
-- `audio_only`
-- `full_audio`
+async def main():
+    payload = {
+        "url": "https://www.instagram.com/reel/xxxxxxxxxxx/",
+        "downloadMode": "auto"
+    }
 
-## Лицензия и источники
+    async with aiohttp.ClientSession() as session:
+        async with session.post(
+            f"{BASE_URL}/",
+            headers={
+                "Accept": "application/json",
+                "Content-Type": "application/json",
+            },
+            json=payload,
+        ) as resp:
+            data = await resp.json()
+            print(data)
 
-Логика сервиса основана на подходах проекта cobalt:
-- [cobalt](https://github.com/frymex/cobalt)
+        # If status == "tunnel", download content directly from data["url"]
+        # If status == "picker", choose an item from data["picker"] and request its url
 
-При публичном использовании изменений учитывайте условия лицензии исходного проекта.
+asyncio.run(main())
+```
+
+## Quick Health Check
+
+```bash
+curl http://localhost:8010/health
+```
+
+Expected:
+
+```json
+{"status":"ok"}
+```
+
+## Notes
+
+- Tunnel URLs are temporary and signed.
+- In production, always set a secure `TUNNEL_SECRET`.
+- Behavior may change if upstream platforms change internal response formats.

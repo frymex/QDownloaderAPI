@@ -1,0 +1,12 @@
+services:
+  qdownloader-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: qdownloader-api
+    restart: unless-stopped
+    ports:
+      - "8010:8010"
+    environment:
+      TUNNEL_SECRET: ${TUNNEL_SECRET:-change-me}
+      TUNNEL_TTL_SECONDS: ${TUNNEL_TTL_SECONDS:-900}

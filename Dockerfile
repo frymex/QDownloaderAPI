@@ -2,7 +2,9 @@ FROM python:3.12-slim AS runtime
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    PIP_NO_CACHE_DIR=1
+    PIP_NO_CACHE_DIR=1 \
+    HOST=0.0.0.0 \
+    PORT=8010
 
 WORKDIR /app
 
@@ -20,4 +22,4 @@ USER appuser
 
 EXPOSE 8010
 
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8010"]
+CMD ["sh", "-c", "uvicorn main:app --host ${HOST:-0.0.0.0} --port ${PORT:-8010}"]

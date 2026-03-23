@@ -6,7 +6,9 @@ services:
     container_name: qdownloader-api
     restart: unless-stopped
     ports:
-      - "8010:8010"
+      - "${PORT:-8010}:${PORT:-8010}"
     environment:
+      HOST: ${HOST:-0.0.0.0}
+      PORT: ${PORT:-8010}
       TUNNEL_SECRET: ${TUNNEL_SECRET:-change-me}
       TUNNEL_TTL_SECONDS: ${TUNNEL_TTL_SECONDS:-900}

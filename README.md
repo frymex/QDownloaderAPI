@@ -86,11 +86,25 @@ Environment variables:
 - `TUNNEL_TTL_SECONDS`  
   Tunnel token lifetime in seconds (default: `900`).
 
+- `HOST`  
+  Bind host for uvicorn inside container (default: `0.0.0.0`).
+
+- `PORT`  
+  Service port inside container and published port in compose (default: `8010`).
+
 Example `.env`:
 
 ```env
+HOST=0.0.0.0
+PORT=8010
 TUNNEL_SECRET=replace-with-a-long-random-secret
 TUNNEL_TTL_SECONDS=900
+```
+
+If you want port `9000`, set:
+
+```env
+PORT=9000
 ```
 
 ## Using It in Projects
